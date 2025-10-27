@@ -1,1 +1,0 @@
-INVOICEID: INV-3c654f6a-63f1-47f6-b571-1b479189c0fcOrder: 8e826ded-ce15-4cc0-9b66-a359af632f5eAmount: 1150.0Paid: trueItems: - ifa hehe x 1Issued: Sun Oct 26 23:43:52 GMT+06:00 2025Transaction: COD-923987
