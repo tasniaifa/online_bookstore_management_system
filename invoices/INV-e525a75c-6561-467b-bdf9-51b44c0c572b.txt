@@ -1,0 +1,1 @@
+INVOICEID: INV-e525a75c-6561-467b-bdf9-51b44c0c572bOrder: 2de1eb06-72a9-4930-b66f-1d3fd443c899Amount: 2125.04Paid: trueItems: - The Dark Tale x 2 - Another Story x 1 - Collected Nightmares x 1Issued: Mon Oct 27 11:00:31 GMT+06:00 2025Transaction: TXN-516857

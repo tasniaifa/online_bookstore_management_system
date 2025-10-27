@@ -1,0 +1,8 @@
+INVOICE
+ID: INV-8edf8f2a-1c6d-400d-8480-b3fb56595e42
+Order: b3ed8dd3-c76f-4941-92dc-6571eecd2c15
+Amount: 1167.3
+Paid: true
+Items:
+ - The Dark Tale x 2
+ - Another Story x 1
