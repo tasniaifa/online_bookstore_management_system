@@ -3,9 +3,13 @@ package online_bookstore_management_system;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.util.Date;
+import java.util.List;
+//Class name Admin
 
+// ---------------------------
+// Order Reporting (SRP)
+// ---------------------------
 public class Admin {
-    // Monster class: reporting, maintenance, user mgmt, order processing, payment refunds, backups, UI printing
     public void printOrderSummary(Order order) {
         System.out.println("=== ORDER SUMMARY ===");
         System.out.println("Order: " + order.getId());
@@ -17,37 +21,61 @@ public class Admin {
         }
     }
 
-    public void refundPayment(Payment payment) {
+    public void runFullSiteReport(List<Book> allBooks) {
+        double totalRevenue = 0;
+        for (Book b : allBooks) {
+            totalRevenue += b.getPrice() * b.getStock();
+        }
+        System.out.println("Total revenue estimate: " + totalRevenue);
+        System.out.println("Total books: " + allBooks.size());
+    }
+}
+
+// ---------------------------
+// Payment Service (SRP, OCP)
+// ---------------------------
+interface PaymentService {
+    void refund(Payment payment);
+}
+
+class BkashPaymentService implements PaymentService {
+    @Override
+    public void refund(Payment payment) {
         if (payment.isSuccess()) {
             System.out.println("Refunding " + payment.getTransactionRef());
         }
     }
+}
 
-    public void backupData(String path) {
+// ---------------------------
+// Backup Service (SRP)
+// ---------------------------
+class BackupService {
+    public void backup(String path) {
         try (FileWriter fw = new FileWriter(path)) {
-            fw.write("backup at " + new Date());
+            fw.write("Backup at " + new Date());
         } catch (IOException e) {
             System.err.println("Backup failed: " + e.getMessage());
         }
     }
+}
 
-    public void createDiscountForCampaign(String code, int pct) {
+// ---------------------------
+// Discount Management (SRP)
+// ---------------------------
+class DiscountService {
+    public void createDiscount(String code, int pct) {
         Discount d = new Discount(code, pct);
         System.out.println("Created discount " + d.getCode() + " for campaign");
     }
+}
 
-    public void deactivateBookPermanently(Book b) {
-        b.archive();
-        System.out.println("Book archived: " + b.getTitle());
-    }
-
-    public void runFullSiteReport() {
-        double totalRevenue = 0;
-        int totalOrders = 0;
-        for (Book b : Book.allBooks()) {
-            totalRevenue += b.getPrice() * b.getStock();
-        }
-        System.out.println("Total revenue estimate: " + totalRevenue);
-        System.out.println("Total books: " + Book.allBooks().size());
+// ---------------------------
+// Book Management (SRP)
+// ---------------------------
+class BookService {
+    public void deactivate(Book book) {
+        book.archive();
+        System.out.println("Book archived: " + book.getTitle());
     }
 }
