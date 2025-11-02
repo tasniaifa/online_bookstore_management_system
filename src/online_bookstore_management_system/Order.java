@@ -9,32 +9,27 @@ import java.util.Collections;
 import java.util.Date;
 import java.util.List;
 import java.util.UUID;
+import java.util.*;
 
-/**
- *
- * @author tasniafarinifa
- */
 public class Order {
-    private String id;
-    private Customer customer;
-    private List<OrderItem> items = new ArrayList<>();
-    private Date createdAt;
-    private double totalAmount;
+    private final String id;
+    private final Customer customer;
+    private final List<OrderItem> items = new ArrayList<>();
+    private final Date createdAt;
     private boolean paid;
-    private ShippingDetails shippingDetails;
-    private Discount appliedDiscount;
-    private String status; // NEW, PROCESSING, SHIPPED, DELIVERED
+    private OrderStatus status;
+    private ShippingServiceDetails shippingDetails;
+    private Discount discount;
+    private double totalAmount;
 
-    // tax and shipping calc bloated into order
-    private double taxRate = 0.1;
-    private double shippingFee = 50.0;
+    private final PricingService pricingService;
 
-    public Order(Customer customer) {
+    public Order(Customer customer, PricingService pricingService) {
         this.id = UUID.randomUUID().toString();
         this.customer = customer;
         this.createdAt = new Date();
-        this.paid = false;
-        this.status = "NEW";
+        this.status = new OrderStatus.NewStatus();
+        this.pricingService = pricingService;
     }
 
     public void addItem(OrderItem item) {
@@ -42,33 +37,27 @@ public class Order {
         recalcTotal();
     }
 
-    public void recalcTotal() {
-        double sum = 0;
-        for (OrderItem it : items) {
-            sum += it.getSubtotal();
-        }
-        if (appliedDiscount != null) {
-            sum = sum - (sum * appliedDiscount.getPercentage() / 100.0);
-        }
-        // tax and shipping directly included (should be external)
-        sum = sum + (sum * taxRate) + shippingFee;
-        this.totalAmount = sum;
+    public void applyDiscount(Discount discount) {
+        this.discount = discount;
+        recalcTotal();
     }
 
-    public double getTotalAmount() { return totalAmount; }
-    public Customer getCustomer() { return customer; }
-    public void markPaid() { this.paid = true; this.status = "PAID"; }
+    private void recalcTotal() {
+        this.totalAmount = pricingService.calculateTotal(items, discount);
+    }
+
+    public void setShippingDetails(ShippingServiceDetails sd) { this.shippingDetails = sd; }
+    public void markPaid() { this.paid = true; this.status = new OrderStatus.PaidStatus(); }
+    public void progressStatus() { this.status = status.nextStatus(); }
+
     public String getId() { return id; }
-    public void setShippingDetails(ShippingDetails sd) { this.shippingDetails = sd; }
-    public void applyDiscount(Discount d) { this.appliedDiscount = d; recalcTotal(); }
+    public Customer getCustomer() { return customer; }
     public List<OrderItem> getItems() { return Collections.unmodifiableList(items); }
-
-    public String getStatus() { return status; }
-    public void progressStatus() {
-        if (status.equals("NEW")) status = "PROCESSING";
-        else if (status.equals("PROCESSING")) status = "SHIPPED";
-        else if (status.equals("SHIPPED")) status = "DELIVERED";
-    }
+    public double getTotalAmount() { return totalAmount; }
+    public boolean isPaid() { return paid; }
+    public String getStatus() { return status.getName(); }
+    public ShippingServiceDetails getShippingDetails() { return shippingDetails; }
 }
+
     
 

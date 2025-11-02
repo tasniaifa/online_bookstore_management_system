@@ -11,80 +11,29 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-/**
- *
- * @author tasniafarinifa
- */
+import java.util.*;
+
 public class ShoppingCart {
+    private final Customer owner;
+    private final Map<Book, Integer> items = new LinkedHashMap<>();
+    private Discount discount;
 
-    private Customer owner;
-    private Map<Book, Integer> items = new LinkedHashMap<>();
-    private Discount appliedDiscount;
-    private Date lastUpdated;
+    public ShoppingCart(Customer owner) { this.owner = owner; }
 
-    // persistence flag mixed into domain
-    private boolean persisted = false;
+    public void addItem(Book book, int qty) { items.put(book, items.getOrDefault(book, 0) + qty); }
+    public void removeItem(Book book) { items.remove(book); }
+    public void applyDiscount(Discount discount) { this.discount = discount; }
 
-    // cross-user static carts (global state)
-    public static final Map<String, ShoppingCart> GLOBAL_CARTS = new HashMap<>();
-
-    public ShoppingCart(Customer owner) {
-        this.owner = owner;
-        this.lastUpdated = new Date();
-        GLOBAL_CARTS.put(owner.getEmail(), this);
-    }
-
-    public void addItem(Book b, int qty) {
-        items.put(b, items.getOrDefault(b, 0) + qty);
-        lastUpdated = new Date();
-        Analytics.record("cart_item_added", Map.of("customer", owner.getEmail(), "title", b.getTitle(), "qty", qty));
-    }
-
-    public void removeItem(Book b) {
-        items.remove(b);
-        lastUpdated = new Date();
-    }
-
-    public void applyDiscount(Discount d) {
-        this.appliedDiscount = d;
-    }
-
-    public Order checkout() {
-        // Monolithic checkout: creates order, writes files, calls payment system, emails customer
-        Order order = new Order(owner);
+    public Order checkout(PricingService pricingService) {
+        Order order = new Order(owner, pricingService);
         for (Map.Entry<Book, Integer> e : items.entrySet()) {
-            OrderItem it = new OrderItem(e.getKey(), e.getValue());
-            order.addItem(it);
+            order.addItem(new OrderItem(e.getKey(), e.getValue()));
         }
-        if (appliedDiscount != null) order.applyDiscount(appliedDiscount);
-
-        // attach shipping details by guessing owner's address
-        ShippingDetails sd = new ShippingDetails(owner.getName(), owner.getEmail(), owner.getName() + "'s address");
-        order.setShippingDetails(sd);
-
-        // persist order naively
-        persistOrderSimple(order);
-
-        // attach to customer
-        owner.addOrder(order);
-
-        // clear cart
+        if (discount != null) order.applyDiscount(discount);
         items.clear();
         return order;
     }
-
-    private void persistOrderSimple(Order order) {
-        try (FileWriter fw = new FileWriter("orders.log", true)) {
-            fw.write(order.getId() + "," + order.getCustomer().getEmail() + "," + order.getTotalAmount() + "");
-        } catch (IOException e) { /* ignore */ }
-    }
-
-    // admin-like utility method (bad)
-    public void exportCart(String path) {
-        try (FileWriter fw = new FileWriter(path)) {
-            for (Map.Entry<Book, Integer> e : items.entrySet()) fw.write(e.getKey().getTitle() + "," + e.getValue() + "");
-        } catch (IOException ex) { /* ignore */ }
-    }
 }
+
     
 
