@@ -1,210 +1,301 @@
-/*
- * Click nbfs://nbhost/SystemFileSystem/Templates/Licenses/license-default.txt to change this license
- * Click nbfs://nbhost/SystemFileSystem/Templates/Classes/Class.java to edit this template
- */
 package online_bookstore_management_system;
 
 import java.io.FileWriter;
 import java.io.IOException;
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Scanner;
-import java.util.UUID;
+import java.util.*;
 
-/**
- *
- * @author tasniafarinifa
- */
+// -----------------------------
+// 1) Domain entity (Book) — SRP
+// -----------------------------
 public class Book {
-    // Mixed responsibilities: data holder + inventory manager + presentation + persistence + analytics
+    private final String isbn;
     private String title;
     private Author author;
     private Publisher publisher;
     private Category category;
-    private double price;
-    private int stock;
-    private String isbn;
     private String description;
-    private Date addedOn;
-
-    // UI hint fields (should not be here in SRP world)
-    private boolean featured;
-    private int popularityScore;
-    private String thumbnailUrl;
-
-    // Logging fields (also violates SRP)
-    private List<String> changeLog = new ArrayList<>();
-
-    // Cross-cutting concern fields (should be extracted)
+    private final Date addedOn;
     private boolean archived;
-    private Map<String, Object> meta = new HashMap<>();
 
-    // Bad static DB-like list: global mutable state
-    public static final List<Book> GLOBAL_BOOKS = new ArrayList<>();
-
-    public Book(String title, Author author, Publisher publisher, Category category, double price, int stock) {
+    public Book(String title, Author author, Publisher publisher, Category category) {
+        this.isbn = UUID.randomUUID().toString();
         this.title = title;
         this.author = author;
         this.publisher = publisher;
         this.category = category;
-        this.price = price;
-        this.stock = stock;
-        this.isbn = UUID.randomUUID().toString();
         this.description = "";
         this.addedOn = new Date();
-        this.featured = false;
-        this.popularityScore = 0;
-        this.thumbnailUrl = "http://example.com/thumbnail/" + this.isbn;
         this.archived = false;
-        GLOBAL_BOOKS.add(this);
-        logChange("Created book: " + title);
     }
 
-    // Input helper (bad: uses scanner and creates object directly)
-    public static Book readFromInput(Scanner sc, Author a, Publisher p, Category c) {
-        System.out.print("Book title: ");
-        String title = sc.nextLine();
-        System.out.print("Price: ");
-        double price = Double.parseDouble(sc.nextLine());
-        System.out.print("Stock: ");
-        int stock = Integer.parseInt(sc.nextLine());
-        Book b = new Book(title, a, p, c, price, stock);
-        System.out.print("Add description? (y/n): ");
-        if (sc.nextLine().trim().equalsIgnoreCase("y")) {
-            System.out.println("Enter description (single line):");
-            b.description = sc.nextLine();
-        }
-        return b;
-    }
+    // Domain behavior only (minimal)
+    public void archive() { this.archived = true; }
 
-    // --- Inventory methods ---
-    public boolean reduceStock(int qty) {
+    // Defensive copy for date
+    public Date getAddedOn() { return new Date(addedOn.getTime()); }
+
+    // Getters / setters for domain fields (no heavy logic)
+    public String getIsbn() { return isbn; }
+    public String getTitle() { return title; }
+    public Author getAuthor() { return author; }
+    public Publisher getPublisher() { return publisher; }
+    public Category getCategory() { return category; }
+    public String getDescription() { return description; }
+    public boolean isArchived() { return archived; }
+    public void setDescription(String d) { this.description = d == null ? "" : d; }
+
+    @Override
+    public String toString() {
+        return "Book[" + title + ", isbn=" + isbn + ", price/stock handled elsewhere]";
+    }
+}
+
+
+// -----------------------------
+// 2) Inventory responsibility
+// -----------------------------
+interface InventoryService {
+    boolean reduceStock(String bookIsbn, int qty);
+    void increaseStock(String bookIsbn, int qty);
+    int getStock(String bookIsbn);
+}
+
+class InMemoryInventoryService implements InventoryService {
+    private final Map<String, Integer> stock = new HashMap<>();
+
+    @Override
+    public synchronized boolean reduceStock(String bookIsbn, int qty) {
         if (qty <= 0) return false;
-        if (stock >= qty) {
-            stock -= qty;
-            logChange("Stock reduced by " + qty + "; remaining=" + stock);
-            // analytics event (side effect)
-            Analytics.record("stock_reduced", Map.of("title", title, "qty", qty));
+        int current = stock.getOrDefault(bookIsbn, 0);
+        if (current >= qty) {
+            stock.put(bookIsbn, current - qty);
             return true;
         }
         return false;
     }
 
-    public void increaseStock(int qty) {
-        stock += qty;
-        logChange("Stock increased by " + qty + "; new=" + stock);
-        Analytics.record("stock_increased", Map.of("title", title, "qty", qty));
+    @Override
+    public synchronized void increaseStock(String bookIsbn, int qty) {
+        if (qty <= 0) return;
+        stock.put(bookIsbn, stock.getOrDefault(bookIsbn, 0) + qty);
     }
 
-    public int getStock() { return stock; }
-    public double getPrice() { return price; }
+    @Override
+    public int getStock(String bookIsbn) {
+        return stock.getOrDefault(bookIsbn, 0);
+    }
+}
 
-    // --- Business calc (should be elsewhere) ---
-    public double calculateDiscountedPrice(Discount discount) {
-        if (discount == null) return price;
-        double discounted = price - (price * discount.getPercentage() / 100.0);
-        logChange("Applied discount " + discount.getCode() + " => " + discounted);
-        return discounted;
+
+// -----------------------------
+// 3) Pricing responsibility
+// -----------------------------
+interface PricingService {
+    double calculateDiscountedPrice(double basePrice, Discount discount);
+    double applyDiscounts(double basePrice, Collection<Discount> discounts);
+}
+
+class SimplePricingService implements PricingService {
+    @Override
+    public double calculateDiscountedPrice(double basePrice, Discount discount) {
+        if (discount == null) return basePrice;
+        return basePrice - (basePrice * discount.getPercentage() / 100.0);
     }
 
-    // new method that applies multiple discounts and mutates state
-    public double applyDiscounts(Collection<Discount> discounts) {
-        double result = this.price;
+    @Override
+    public double applyDiscounts(double basePrice, Collection<Discount> discounts) {
+        double result = basePrice;
+        if (discounts == null) return result;
         for (Discount d : discounts) {
             if (d != null && d.isValid()) {
                 result = result - (result * d.getPercentage() / 100.0);
-                d.consume();
-                logChange("Chained discount " + d.getCode() + " applied");
             }
         }
-        this.price = result; // BAD: mutating price permanently instead of returning value
-        return result;
+        return result; // DOES NOT mutate original price
     }
-
-    // --- Presentation logic (violates SRP) ---
-    public String renderHtmlCard() {
-        StringBuilder sb = new StringBuilder();
-        sb.append("<div class=\"book\">");
-        sb.append("<img src=\"" + thumbnailUrl + "\"/>");
-        sb.append("<h3>" + title + "</h3>");
-        sb.append("<p>by " + author.getName() + "</p>");
-        sb.append("<p>Category: " + category.getName() + "</p>");
-        sb.append("<p>Price: " + price + "</p>");
-        sb.append("<p>Stock: " + stock + "</p>");
-        sb.append("</div>");
-        logChange("Rendered HTML card");
-        return sb.toString();
-    }
-
-    public String renderPlainText() {
-        StringBuilder sb = new StringBuilder();
-        sb.append(title + " by " + author.getName() + "");
-        sb.append("Price: " + price + " | Stock: " + stock + "");
-        return sb.toString();
-    }
-
-    // --- Persistence stub (violates SRP/DI) ---
-    public void saveToDisk(String path) {
-        try (FileWriter fw = new FileWriter(path, true)) {
-            fw.write(this.toString() + "");
-            logChange("Saved to " + path);
-        } catch (IOException e) {
-            logChange("Failed save: " + e.getMessage());
-        }
-    }
-
-    // Overloaded save method that writes JSON-like data
-    public void saveAsJson(String path) {
-        try (FileWriter fw = new FileWriter(path, true)) {
-            fw.write("{");
-            fw.write("  \"title\": \"" + title + "\",");
-            fw.write("  \"author\": \"" + author.getName() + "\",");
-            fw.write("  \"price\": " + price + ",");
-            fw.write("  \"stock\": " + stock + "");
-            fw.write("}");
-            logChange("Saved JSON to " + path);
-        } catch (IOException e) {
-            logChange("Failed JSON save: " + e.getMessage());
-        }
-    }
-
-    // --- Misc ---
-    private void logChange(String note) {
-        changeLog.add(new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date()) + " - " + note);
-    }
-
-    public List<String> getChangeLog() { return Collections.unmodifiableList(changeLog); }
-    public String getTitle() { return title; }
-    public Author getAuthor() { return author; }
-    public String getIsbn() { return isbn; }
-    public void archive() { archived = true; logChange("Archived"); }
-    public boolean isArchived() { return archived; }
-    public void addMetadata(String key, Object value) { meta.put(key, value); }
-    public Object getMetadata(String key) { return meta.get(key); }
-    public String toString() {
-        return "Book[" + title + "," + author.getName() + ",price=" + price + ",stock=" + stock + "]";
-    }
-    
-    // intentionally public to illustrate bad encapsulation (used by Review in original broken design)
-    public void addPopularity(int delta) {
-        this.popularityScore += delta;
-        logChange("Popularity changed by " + delta + "; now=" + this.popularityScore);
-    }
-
-    // Convenience static methods that touch other classes directly (tight coupling)
-    public static Book findByTitle(String title) {
-        for (Book b : GLOBAL_BOOKS) {
-            if (b.title.equalsIgnoreCase(title)) return b;
-        }
-        return null;
-    }
-
-    public static List<Book> allBooks() { return Collections.unmodifiableList(GLOBAL_BOOKS); }
 }
-   
+
+
+// -----------------------------
+// 4) Rendering responsibility
+// -----------------------------
+interface BookRenderer {
+    String renderHtml(Book book, int stock, double price);
+    String renderText(Book book, int stock, double price);
+}
+
+class SimpleBookRenderer implements BookRenderer {
+    @Override
+    public String renderHtml(Book book, int stock, double price) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("<div class='book'>");
+        sb.append("<h3>").append(book.getTitle()).append("</h3>");
+        sb.append("<p>by ").append(book.getAuthor().getName()).append("</p>");
+        sb.append("<p>Price: ").append(price).append("</p>");
+        sb.append("<p>Stock: ").append(stock).append("</p>");
+        sb.append("</div>");
+        return sb.toString();
+    }
+
+    @Override
+    public String renderText(Book book, int stock, double price) {
+        return book.getTitle() + " by " + book.getAuthor().getName()
+            + " | Price: " + price + " | Stock: " + stock;
+    }
+}
+
+
+// -----------------------------
+// 5) Persistence responsibility
+// -----------------------------
+interface BookRepository {
+    void save(Book book);
+    Optional<Book> findByIsbn(String isbn);
+    List<Book> findAll();
+}
+
+class InMemoryBookRepository implements BookRepository {
+    private final Map<String, Book> map = new HashMap<>();
+
+    @Override
+    public void save(Book book) { map.put(book.getIsbn(), book); }
+
+    @Override
+    public Optional<Book> findByIsbn(String isbn) {
+        return Optional.ofNullable(map.get(isbn));
+    }
+
+    @Override
+    public List<Book> findAll() { return Collections.unmodifiableList(new ArrayList<>(map.values())); }
+}
+
+class FileBookRepository implements BookRepository {
+    private final String path;
+    public FileBookRepository(String path) { this.path = path; }
+
+    @Override
+    public void save(Book book) {
+        try (FileWriter fw = new FileWriter(path, true)) {
+            fw.write(book.toString() + "\n");
+        } catch (IOException e) {
+            System.err.println("Save failed: " + e.getMessage());
+        }
+    }
+
+    @Override
+    public Optional<Book> findByIsbn(String isbn) { throw new UnsupportedOperationException("Not implemented"); }
+
+    @Override
+    public List<Book> findAll() { throw new UnsupportedOperationException("Not implemented"); }
+}
+
+
+// -----------------------------
+// 6) Logging / Audit responsibility
+// -----------------------------
+interface BookLogger {
+    void log(String note);
+}
+
+class InMemoryBookLogger implements BookLogger {
+    private final List<String> lines = new ArrayList<>();
+    @Override
+    public void log(String note) {
+        String ts = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date());
+        lines.add(ts + " - " + note);
+    }
+    public List<String> getLog() { return Collections.unmodifiableList(lines); }
+}
+
+
+// -----------------------------
+// 7) Analytics (cross-cutting)
+// -----------------------------
+interface AnalyticsService {
+    void record(String event, Map<String,Object> meta);
+}
+
+class SimpleAnalyticsService implements AnalyticsService {
+    @Override
+    public void record(String event, Map<String,Object> meta) {
+        // simple print for demo
+        System.out.println("ANALYTICS: " + event + " => " + meta);
+    }
+}
+
+
+// -----------------------------
+// 8) Factory / Input responsibility
+// -----------------------------
+class BookFactory {
+    public static Book fromInput(Scanner sc, Author a, Publisher p, Category c) {
+        System.out.print("Book title: ");
+        String title = sc.nextLine();
+        System.out.print("Price (ignored by Book entity): ");
+        sc.nextLine(); // read but pricing handled elsewhere
+        System.out.print("Stock (ignored by Book entity): ");
+        sc.nextLine();
+        Book b = new Book(title, a, p, c);
+        System.out.print("Add description? (y/n): ");
+        if (sc.nextLine().trim().equalsIgnoreCase("y")) {
+            System.out.println("Enter description (single line):");
+            b.setDescription(sc.nextLine());
+        }
+        return b;
+    }
+}
+
+
+// -----------------------------
+// 9) Orchestration / High-level API
+// -----------------------------
+class BookService {
+    private final BookRepository repo;
+    private final InventoryService inventory;
+    private final PricingService pricing;
+    private final BookLogger logger;
+    private final AnalyticsService analytics;
+
+    public BookService(BookRepository repo,
+                       InventoryService inventory,
+                       PricingService pricing,
+                       BookLogger logger,
+                       AnalyticsService analytics) {
+        this.repo = repo;
+        this.inventory = inventory;
+        this.pricing = pricing;
+        this.logger = logger;
+        this.analytics = analytics;
+    }
+
+    // create and persist book (service handles multiple responsibilities by delegating)
+    public Book createBook(String title, Author author, Publisher publisher, Category category,
+                           int initialStock, double initialPrice) {
+        Book b = new Book(title, author, publisher, category);
+        repo.save(b);
+        inventory.increaseStock(b.getIsbn(), initialStock);
+        // we don't store price in Book entity: external systems track price
+        logger.log("Created book: " + b.getTitle());
+        analytics.record("book_created", Map.of("isbn", b.getIsbn(), "title", b.getTitle()));
+        return b;
+    }
+
+    public boolean sellBook(String isbn, int qty) {
+        boolean ok = inventory.reduceStock(isbn, qty);
+        if (ok) {
+            logger.log("Sold " + qty + " of " + isbn);
+            analytics.record("book_sold", Map.of("isbn", isbn, "qty", qty));
+        }
+        return ok;
+    }
+
+    public String renderBookCard(String isbn, double price) {
+        Optional<Book> ob = repo.findByIsbn(isbn);
+        if (ob.isEmpty()) return "Not found";
+        Book b = ob.get();
+        int stock = inventory.getStock(isbn);
+        BookRenderer r = new SimpleBookRenderer();
+        return r.renderHtml(b, stock, price);
+    }
+}
