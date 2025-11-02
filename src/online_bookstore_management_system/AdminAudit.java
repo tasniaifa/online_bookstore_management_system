@@ -1,15 +1,41 @@
 package online_bookstore_management_system;
+
 import java.io.FileWriter;
 import java.io.IOException;
 import java.util.Date;
-/**
- *
- * @author tasniafarinifa
- */
+
+// 1️⃣ SRP + DIP — Interface for logging
+interface AuditLogger {
+    void log(String message);
+}
+
+// 2️⃣ Low-level implementation (File)
+class FileAuditLogger implements AuditLogger {
+    private final String filePath;
+
+    public FileAuditLogger(String filePath) {
+        this.filePath = filePath;
+    }
+
+    @Override
+    public void log(String message) {
+        try (FileWriter fw = new FileWriter(filePath, true)) {
+            fw.write(new Date() + " - " + message + "\n");
+        } catch (IOException e) {
+            System.err.println("Log failed: " + e.getMessage());
+        }
+    }
+}
+
+// 3️⃣ High-level class depends on interface, not FileWriter
 public class AdminAudit {
-    public static void log(String message) {
-        try (FileWriter fw = new FileWriter("admin_audit.log", true)) { //record/log a message
-            fw.write(new Date() + " - " + message + ""); // handle file writing
-        } catch (IOException e) { /* ignore */ }      
+    private final AuditLogger logger;
+
+    public AdminAudit(AuditLogger logger) {
+        this.logger = logger;
+    }
+
+    public void record(String message) {
+        logger.log(message);
     }
 }
