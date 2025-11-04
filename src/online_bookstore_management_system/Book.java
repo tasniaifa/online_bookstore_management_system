@@ -5,9 +5,7 @@ import java.io.IOException;
 import java.text.SimpleDateFormat;
 import java.util.*;
 
-// -----------------------------
-// 1) Domain entity (Book) — SRP
-// -----------------------------
+// 1) Domain entity (Book)
 public class Book {
     private final String isbn;
     private String title;
@@ -29,13 +27,10 @@ public class Book {
         this.archived = false;
     }
 
-    // Domain behavior only (minimal)
     public void archive() { this.archived = true; }
 
-    // Defensive copy for date
     public Date getAddedOn() { return new Date(addedOn.getTime()); }
-
-    // Getters / setters for domain fields (no heavy logic)
+    
     public String getIsbn() { return isbn; }
     public String getTitle() { return title; }
     public Author getAuthor() { return author; }
@@ -52,9 +47,7 @@ public class Book {
 }
 
 
-// -----------------------------
 // 2) Inventory responsibility
-// -----------------------------
 interface InventoryService {
     boolean reduceStock(String bookIsbn, int qty);
     void increaseStock(String bookIsbn, int qty);
@@ -88,9 +81,7 @@ class InMemoryInventoryService implements InventoryService {
 }
 
 
-// -----------------------------
 // 3) Pricing responsibility
-// -----------------------------
 interface PricingService {
     double calculateDiscountedPrice(double basePrice, Discount discount);
     double applyDiscounts(double basePrice, Collection<Discount> discounts);
@@ -112,14 +103,12 @@ class SimplePricingService implements PricingService {
                 result = result - (result * d.getPercentage() / 100.0);
             }
         }
-        return result; // DOES NOT mutate original price
+        return result;
     }
 }
 
 
-// -----------------------------
 // 4) Rendering responsibility
-// -----------------------------
 interface BookRenderer {
     String renderHtml(Book book, int stock, double price);
     String renderText(Book book, int stock, double price);
@@ -243,59 +232,5 @@ class BookFactory {
             b.setDescription(sc.nextLine());
         }
         return b;
-    }
-}
-
-
-// -----------------------------
-// 9) Orchestration / High-level API
-// -----------------------------
-class BookService {
-    private final BookRepository repo;
-    private final InventoryService inventory;
-    private final PricingService pricing;
-    private final BookLogger logger;
-    private final AnalyticsService analytics;
-
-    public BookService(BookRepository repo,
-                       InventoryService inventory,
-                       PricingService pricing,
-                       BookLogger logger,
-                       AnalyticsService analytics) {
-        this.repo = repo;
-        this.inventory = inventory;
-        this.pricing = pricing;
-        this.logger = logger;
-        this.analytics = analytics;
-    }
-
-    // create and persist book (service handles multiple responsibilities by delegating)
-    public Book createBook(String title, Author author, Publisher publisher, Category category,
-                           int initialStock, double initialPrice) {
-        Book b = new Book(title, author, publisher, category);
-        repo.save(b);
-        inventory.increaseStock(b.getIsbn(), initialStock);
-        // we don't store price in Book entity: external systems track price
-        logger.log("Created book: " + b.getTitle());
-        analytics.record("book_created", Map.of("isbn", b.getIsbn(), "title", b.getTitle()));
-        return b;
-    }
-
-    public boolean sellBook(String isbn, int qty) {
-        boolean ok = inventory.reduceStock(isbn, qty);
-        if (ok) {
-            logger.log("Sold " + qty + " of " + isbn);
-            analytics.record("book_sold", Map.of("isbn", isbn, "qty", qty));
-        }
-        return ok;
-    }
-
-    public String renderBookCard(String isbn, double price) {
-        Optional<Book> ob = repo.findByIsbn(isbn);
-        if (ob.isEmpty()) return "Not found";
-        Book b = ob.get();
-        int stock = inventory.getStock(isbn);
-        BookRenderer r = new SimpleBookRenderer();
-        return r.renderHtml(b, stock, price);
     }
 }
