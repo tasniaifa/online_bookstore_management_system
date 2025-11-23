@@ -1,4 +1,5 @@
 package online_bookstore_management_system;
+
 import java.io.FileWriter;
 import java.io.IOException;
 import java.text.SimpleDateFormat;
@@ -8,7 +9,7 @@ import java.util.List;
 
 //change in book, author and publisher
 
-interface Logger {           //event or message record kora
+interface Logger { // event or message record kora
     void log(String message);
 }
 
@@ -36,25 +37,24 @@ class FileLogger implements Logger {
     }
 }
 
-
 public class Analytics {
-    private final List<Logger> loggers;
+    private static List<Logger> loggers;
 
     public Analytics(List<Logger> loggers) {
         this.loggers = loggers;
     }
 
-    public void record(String event, Map<String, Object> payload) {
+    public static void record(String event, Map<String, Object> payload) {
         String message = "[ANALYTICS] " + event + " => " + payload;
-        String timestamped = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date()) 
-                             + " " + event + " " + payload;
-        //2025-11-02 23:40:12 book_sold {isbn=123, qty=2}
+        String timestamped = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date())
+                + " " + event + " " + payload;
+        // 2025-11-02 23:40:12 book_sold {isbn=123, qty=2}
 
         for (Logger logger : loggers) {
             if (logger instanceof FileLogger) {
-                logger.log(timestamped); //2025-11-02 23:40:12 book_sold {isbn=123, qty=2}
+                logger.log(timestamped); // 2025-11-02 23:40:12 book_sold {isbn=123, qty=2}
             } else {
-                logger.log(message); //[ANALYTICS] book_sold => {isbn=123, qty=2}
+                logger.log(message); // [ANALYTICS] book_sold => {isbn=123, qty=2}
             }
         }
     }
