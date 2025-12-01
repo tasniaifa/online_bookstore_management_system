@@ -30,6 +30,10 @@ public class Customer {
     // Preferred payment stored, but logic handled elsewhere
     private String preferredPaymentMethod;
 
+    public void setPreferredPaymentMethod(String preferredPaymentMethod) {
+        this.preferredPaymentMethod = preferredPaymentMethod;
+    }
+
     public Customer(String name, String email, String address) {
         this.name = name;
         this.email = email;
@@ -139,13 +143,15 @@ class DefaultCustomerReviewService implements CustomerReviewService {
 // PAYMENT PREFERENCE HANDLING (SRP / OCP)
 // - Customer does NOT implement payment logic
 // =========================================================
+
 interface PaymentPreferenceService {
-    void applyPreference(Customer c, String method);
+    void applyPreference(Customer c, PaymentMethod method);
 }
 
 class BasicPaymentPreferenceService implements PaymentPreferenceService {
     @Override
-    public void applyPreference(Customer c, String method) {
+    public void applyPreference(Customer c, PaymentMethod method) {
+        c.setPreferredPaymentMethod(method.name());
         System.out.println("Applied preferred payment method: " + method);
     }
 }

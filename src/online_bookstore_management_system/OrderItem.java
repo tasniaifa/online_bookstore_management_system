@@ -17,10 +17,10 @@ public class OrderItem {
     private double priceAtOrder; // snapshot price
     private Map<String, Object> extraProps = new HashMap<>();
 
-    public OrderItem(Book book, int qty) {
+    public OrderItem(Book book, int qty, double priceAtOrder) {
         this.book = book;
         this.quantity = qty;
-        this.priceAtOrder = book.getPrice();
+        this.priceAtOrder = priceAtOrder;
 
         // Removed: book.reduceStock(qty);
         // Inventory logic now handled by InventoryService (DIP)
