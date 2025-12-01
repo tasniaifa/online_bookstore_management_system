@@ -15,6 +15,11 @@ import java.util.Scanner;
  *
  * @author tasniafarinifa
  */
+
+interface AuthorEventHandler {
+    void onBookAdded(Author author, Book book);
+}
+
 public class Author {
     private String name;
     private String email;
@@ -25,10 +30,13 @@ public class Author {
     private int publishedCount;
     private Date lastNotified;
 
+    private final AuthorEventHandler eventHandler;
+
     public Author(String name, String email) {
         this.name = name;
         this.email = email;
         this.biography = "";
+        this.eventHandler = eventHandler;
     }
 
     public static Author readFromInput(Scanner sc) {
@@ -47,6 +55,11 @@ public class Author {
 
     public void addBook(Book b) {
         books.add(b);
+
+        // notify via interface instead of direct Analytics / print
+        if (eventHandler != null) {
+            eventHandler.onBookAdded(this, book);
+        }
     }
 
     public String getName() {
