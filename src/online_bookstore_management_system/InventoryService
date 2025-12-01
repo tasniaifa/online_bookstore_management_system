@@ -1,0 +1,10 @@
+package online_bookstore_management_system;
+
+public class InventoryService implements InventoryManager {
+
+    @Override
+    public void addInitialStock(Book book, int quantity) {
+        book.increaseStock(quantity);
+    }
+}
+
