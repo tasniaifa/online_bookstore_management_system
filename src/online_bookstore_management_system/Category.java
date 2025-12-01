@@ -24,13 +24,8 @@ public class Category {
         this.description = description;
     }
 
-    public static Category readFromInput(Scanner sc) {
-        System.out.print("Category name: ");
-        String name = sc.nextLine();
-        System.out.print("Category description: ");
-        String desc = sc.nextLine();
-        return new Category(name, desc);
-    }
+    Scanner sc = new Scanner(System.in);
+    Category newCategory = CategoryFactory.createCategoryFromInput(sc);
 
     /**
      * Category no longer handles caching itself (SRP fixed)
