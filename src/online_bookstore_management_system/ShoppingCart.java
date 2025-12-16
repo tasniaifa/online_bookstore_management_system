@@ -1,17 +1,7 @@
-/*
- * Click nbfs://nbhost/SystemFileSystem/Templates/Licenses/license-default.txt to change this license
- * Click nbfs://nbhost/SystemFileSystem/Templates/Classes/Class.java to edit this template
- */
 package online_bookstore_management_system;
 
-import java.io.FileWriter;
-import java.io.IOException;
-import java.util.Date;
-import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
-
-import java.util.*;
 
 public class ShoppingCart {
     private final Customer owner;
@@ -24,16 +14,21 @@ public class ShoppingCart {
     public void removeItem(Book book) { items.remove(book); }
     public void applyDiscount(Discount discount) { this.discount = discount; }
 
+    // checkout now reduces inventory (one place), creates order items, and returns order
     public Order checkout(PricingService pricingService) {
         Order order = new Order(owner, pricingService);
         for (Map.Entry<Book, Integer> e : items.entrySet()) {
-            order.addItem(new OrderItem(e.getKey(), e.getValue()));
+            Book book = e.getKey();
+            int qty = e.getValue();
+            String isbn = book.getIsbn();
+
+            // move inventory mutation here so OrderItem is pure and has no side effects
+            book.reduceStock(isbn, qty);
+
+            order.addItem(new OrderItem(book, qty));
         }
         if (discount != null) order.applyDiscount(discount);
         items.clear();
         return order;
     }
 }
-
-    
-
