@@ -1,26 +1,12 @@
 package online_bookstore_management_system;
 
-public class PaymentFactory {
+abstract class PaymentFactory {
 
-    public static PaymentProcessor createCreditCardProcessor(
-            PricingService pricingService,
-            InvoiceService invoiceService,
-            String cardNumber,
-            String expiry,
-            String cvv
-    ) {
-        return new CreditCardPaymentProcessor(
-                pricingService,
-                invoiceService,
-                cardNumber,
-                expiry,
-                cvv
-        );
-    }
-
-    public static PaymentProcessor createCashProcessor(
+    abstract PaymentProcessor createCreditCardProcessor(
             PricingService pricingService
-    ) {
-        return new CashPaymentProcessor(pricingService);
-    }
+    );
+
+    abstract PaymentProcessor createCashProcessor(
+            PricingService pricingService
+    );
 }
