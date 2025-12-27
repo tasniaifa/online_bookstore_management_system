@@ -1,38 +1,33 @@
 package online_bookstore_management_system;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Scanner;
+import java.util.*;
 
-// =========================================================
-//                    CUSTOMER (DOMAIN CLASS)
-//  - Holds only customer-related data & behavior
-//  - NO persistence
-//  - NO admin auditing
-//  - NO business workflow
-//  (SRP Applied)
-// =========================================================
+/*
+=========================================================
+ CUSTOMER (DOMAIN CLASS)
+---------------------------------------------------------
+✔ SRP: Holds ONLY customer data & core behavior
+✔ NO file I/O
+✔ NO admin/audit logic
+✔ NO business workflows
+=========================================================
+*/
 public class Customer {
 
     private String name;
     private String email;
     private String address;
     private String phone;
+
     private List<Order> orders = new ArrayList<>();
     private double outstandingBalance;
 
-    // Domain-only attributes
+    // Domain state
     private boolean blacklisted;
     private String notes;
 
-    // Delegated responsibility:
-    // Preferred payment stored, but logic handled elsewhere
+    // Delegated responsibility
     private String preferredPaymentMethod;
-
-    public void setPreferredPaymentMethod(String preferredPaymentMethod) {
-        this.preferredPaymentMethod = preferredPaymentMethod;
-    }
 
     public Customer(String name, String email, String address) {
         this.name = name;
@@ -56,9 +51,9 @@ public class Customer {
 
         System.out.print("Phone (optional): ");
         String phone = sc.nextLine();
-        if (!phone.isBlank())
+        if (!phone.isBlank()) {
             c.phone = phone;
-
+        }
         return c;
     }
 
@@ -70,20 +65,25 @@ public class Customer {
         return Collections.unmodifiableList(orders);
     }
 
-    public String getEmail() {
-        return email;
-    }
-
     public String getName() {
         return name;
     }
 
-    // Delegated behavior
+    public String getEmail() {
+        return email;
+    }
+
+    /*
+     * -----------------------------------------------------
+     * Delegated behavior (DIP)
+     * Customer does NOT implement review logic itself
+     * -----------------------------------------------------
+     */
     public void blacklist(String reason, CustomerReviewService reviewer) {
         reviewer.flagCustomer(this, reason);
     }
 
-    // Setters for service classes
+    // Setters used by service layer
     public void setBlacklisted(boolean b) {
         this.blacklisted = b;
     }
@@ -99,13 +99,39 @@ public class Customer {
     public String getNotes() {
         return notes;
     }
+
+    public void setPreferredPaymentMethod(String method) {
+        this.preferredPaymentMethod = method;
+    }
 }
 
-// =========================================================
-// PERSISTENCE SERVICE (SRP)
-// - Extracted from Customer.saveProfile()
-// - Customer no longer handles file IO
-// =========================================================
+/*
+ * =========================================================
+ * CUSTOMER REVIEW / AUDIT SERVICE
+ * ---------------------------------------------------------
+ * ✔ SRP: Handles customer review only
+ * ✔ DIP: Customer depends on abstraction
+ * =========================================================
+ */
+interface CustomerReviewService {
+    void flagCustomer(Customer customer, String reason);
+}
+
+class DefaultCustomerReviewService implements CustomerReviewService {
+    @Override
+    public void flagCustomer(Customer customer, String reason) {
+        customer.setBlacklisted(true);
+        customer.setNotes(reason);
+    }
+}
+
+/*
+ * =========================================================
+ * PERSISTENCE SERVICE
+ * ---------------------------------------------------------
+ * ✔ SRP: File storage extracted from Customer
+ * =========================================================
+ */
 interface CustomerPersistence {
     void save(Customer customer, String file);
 }
@@ -116,54 +142,48 @@ class FileCustomerPersistence implements CustomerPersistence {
         try (java.io.FileWriter fw = new java.io.FileWriter(file, true)) {
             fw.write(c.getName() + "," + c.getEmail() + "," + c.getNotes() + "\n");
         } catch (Exception e) {
+            throw new RuntimeException("Failed to save customer", e);
         }
     }
 }
 
-// =========================================================
-// CUSTOMER REVIEW / AUDIT SERVICE (SRP)
-// - Extracted from AdminAudit.log() call
-// - Customer no longer depends on Admin
-// (DIP applied)
-// =========================================================
-interface CustomerReviewService {
-    void flagCustomer(Customer c, String reason);
-}
-
-class DefaultCustomerReviewService implements CustomerReviewService {
-    @Override
-    public void flagCustomer(Customer c, String reason) {
-        c.setBlacklisted(true);
-        c.setNotes(reason);
-        System.out.println("Customer flagged for review: " + c.getName() + " | Reason: " + reason);
-    }
-}
-
-// =========================================================
-// PAYMENT PREFERENCE HANDLING (SRP / OCP)
-// - Customer does NOT implement payment logic
-// =========================================================
-
+/*
+ * =========================================================
+ * PAYMENT PREFERENCE SERVICE
+ * ---------------------------------------------------------
+ * ✔ SRP: Payment preference logic separated
+ * =========================================================
+ */
 interface PaymentPreferenceService {
-    void applyPreference(Customer c, PaymentMethod method);
+    void setPreferredMethod(Customer customer, String method);
 }
 
 class BasicPaymentPreferenceService implements PaymentPreferenceService {
     @Override
-    public void applyPreference(Customer c, PaymentMethod method) {
-        c.setPreferredPaymentMethod(method.name());
-        System.out.println("Applied preferred payment method: " + method);
+    public void setPreferredMethod(Customer customer, String method) {
+        customer.setPreferredPaymentMethod(method);
     }
 }
 
-// =========================================================
-// CUSTOMER ANALYTICS SERVICE (Extra SRP)
-// =========================================================
-class CustomerAnalyticsService {
-    public double calculateLifetimeValue(Customer c) {
-        return c.getOrders()
-                .stream()
-                .mapToDouble(Order::getTotalAmount)
-                .sum();
+/*
+ * =========================================================
+ * SERVICE FACTORY
+ * ---------------------------------------------------------
+ * ✔ Centralized object creation
+ * ✔ Supports OCP
+ * =========================================================
+ */
+class CustomerServiceFactory {
+
+    public static CustomerReviewService reviewService() {
+        return new DefaultCustomerReviewService();
+    }
+
+    public static CustomerPersistence persistenceService() {
+        return new FileCustomerPersistence();
+    }
+
+    public static PaymentPreferenceService paymentPreferenceService() {
+        return new BasicPaymentPreferenceService();
     }
 }
