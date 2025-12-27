@@ -258,5 +258,5 @@ Within the layered architecture, the MVC pattern is applied to organize user int
   - PaymentProcessor  
 
 MVC separates data, control logic, and user interaction, making the system easier to modify and extend.  
-
-**Conclusion:** The system is now cleaner, more flexible, and easier to test and scale.
+# Conclusion
+The system is now cleaner, more flexible, and easier to test and scale.
