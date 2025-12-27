@@ -13,13 +13,11 @@ public class Discount {
         this.validUntil = validUntil;
     }
 
-    public boolean isValid() { 
-        return new Date().before(validUntil); 
+    public boolean isValid() {
+        return validUntil != null && new Date().before(validUntil);
     }
 
-    public int getPercentage() { 
-        return percentage; 
-    }
+    public int getPercentage() { return percentage; }
 
     public double apply(double subtotal) {
         return subtotal * (percentage / 100.0);

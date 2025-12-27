@@ -9,21 +9,22 @@ import java.util.List;
 public interface PricingService {
     double calculateTotal(List<OrderItem> items, Discount discount);
 }
+
 public class PricingServiceDetails implements PricingService {
 
-    
     @Override
     public double calculateTotal(List<OrderItem> items, Discount discount) {
         double subtotal = 0.0;
         for (OrderItem item : items) {
-            subtotal += item.getSubtotal(); 
+            subtotal += item.getSubtotal();
         }
 
-        if (discount != null) {
-            subtotal -= discount.apply(subtotal); 
+        if (discount != null && discount.isValid()) {
+            subtotal -= discount.apply(subtotal);
         }
 
         return Math.max(subtotal, 0.0);
     }
 }
+
 
